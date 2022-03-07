@@ -34,6 +34,12 @@ extern "C" {
 
 #include "ansidecl.h"
 #include "symcat.h"
+#include <stdlib.h>
+#include <string.h>
+#include <stdbool.h>
+
+#define IS_DIGIT(x) ((x) >= '0' && (x) <= '9')
+
 #if defined (__STDC__) || defined (ALMOST_STDC) || defined (HAVE_STRINGIZE)
 #ifndef SABER
 /* This hack is to avoid a problem with some strict ANSI C preprocessors.
@@ -599,7 +605,6 @@ bfd_get_bits (const void *p, int bits, bfd_boolean big_p)
 
   return data;
 }
-void bfd_put_bits (bfd_uint64_t, void *, int, bfd_boolean);
 
 extern bfd_boolean bfd_section_already_linked_table_init (void);
 extern void bfd_section_already_linked_table_free (void);
@@ -2067,6 +2072,238 @@ const bfd_arch_info_type *bfd_scan_arch (const char *string);
 
 const char **bfd_arch_list (void);
 
+static bfd_boolean
+bfd_default_scan (const bfd_arch_info_type *info, const char *string)
+{
+	const char *ptr_src;
+	const char *ptr_tst;
+	unsigned long number;
+	enum bfd_architecture arch;
+	const char *printable_name_colon;
+
+	/* Exact match of the architecture name (ARCH_NAME) and also the
+	   default architecture?  */
+	if (strcasecmp (string, info->arch_name) == 0
+		&& info->the_default)
+		return true;
+
+	/* Exact match of the machine name (PRINTABLE_NAME)?  */
+	if (strcasecmp (string, info->printable_name) == 0)
+		return true;
+
+	/* Given that printable_name contains no colon, attempt to match:
+	   ARCH_NAME [ ":" ] PRINTABLE_NAME?  */
+	printable_name_colon = strchr (info->printable_name, ':');
+	if (printable_name_colon == NULL)
+	{
+		size_t strlen_arch_name = strlen (info->arch_name);
+		if (strncasecmp (string, info->arch_name, strlen_arch_name) == 0)
+		{
+			if (string[strlen_arch_name] == ':')
+			{
+				if (strcasecmp (string + strlen_arch_name + 1,
+					    info->printable_name) == 0)
+					return true;
+			}
+			else
+			{
+				if (strcasecmp (string + strlen_arch_name,
+					    info->printable_name) == 0)
+					return true;
+			}
+		}
+	}
+
+	/* Given that PRINTABLE_NAME has the form: <arch> ":" <mach>;
+	   Attempt to match: <arch> <mach>?  */
+	if (printable_name_colon != NULL)
+	{
+		size_t colon_index = printable_name_colon - info->printable_name;
+		if (strncasecmp (string, info->printable_name, colon_index) == 0
+			&& strcasecmp (string + colon_index,
+				   info->printable_name + colon_index + 1) == 0)
+			return true;
+	}
+
+	/* Given that PRINTABLE_NAME has the form: <arch> ":" <mach>; Do not
+	   attempt to match just <mach>, it could be ambiguous.  This test
+	   is left until later.  */
+
+	/* NOTE: The below is retained for compatibility only.  Please do
+	   not add to this code.  */
+
+	/* See how much of the supplied string matches with the
+	   architecture, eg the string m68k:68020 would match the 68k entry
+	   up to the :, then we get left with the machine number.  */
+
+	for (ptr_src = string, ptr_tst = info->arch_name;
+		*ptr_src && *ptr_tst;
+		ptr_src++, ptr_tst++)
+	{
+		if (*ptr_src != *ptr_tst)
+			break;
+	}
+
+	/* Chewed up as much of the architecture as will match, skip any
+	   colons.  */
+	if (*ptr_src == ':')
+		ptr_src++;
+
+	if (*ptr_src == 0)
+	{
+		/* Nothing more, then only keep this one if it is the default
+		   machine for this architecture.  */
+		return info->the_default;
+	}
+
+	number = 0;
+	while (IS_DIGIT (*ptr_src))
+	{
+		number = number * 10 + *ptr_src - '0';
+		ptr_src++;
+	}
+
+	/* NOTE: The below is retained for compatibility only.
+	   PLEASE DO NOT ADD TO THIS CODE.  */
+
+	switch (number)
+	{
+	case 68000:
+		arch = bfd_arch_m68k;
+		number = bfd_mach_m68000;
+		break;
+	case 68010:
+		arch = bfd_arch_m68k;
+		number = bfd_mach_m68010;
+		break;
+	case 68020:
+		arch = bfd_arch_m68k;
+		number = bfd_mach_m68020;
+		break;
+	case 68030:
+		arch = bfd_arch_m68k;
+		number = bfd_mach_m68030;
+		break;
+	case 68040:
+		arch = bfd_arch_m68k;
+		number = bfd_mach_m68040;
+		break;
+	case 68060:
+		arch = bfd_arch_m68k;
+		number = bfd_mach_m68060;
+		break;
+	case 68332:
+		arch = bfd_arch_m68k;
+		number = bfd_mach_cpu32;
+		break;
+	case 5200:
+		arch = bfd_arch_m68k;
+		number = bfd_mach_mcf_isa_a_nodiv;
+		break;
+	case 5206:
+		arch = bfd_arch_m68k;
+		number = bfd_mach_mcf_isa_a_mac;
+		break;
+	case 5307:
+		arch = bfd_arch_m68k;
+		number = bfd_mach_mcf_isa_a_mac;
+		break;
+	case 5407:
+		arch = bfd_arch_m68k;
+		number = bfd_mach_mcf_isa_b_nousp_mac;
+		break;
+	case 5282:
+		arch = bfd_arch_m68k;
+		number = bfd_mach_mcf_isa_aplus_emac;
+		break;
+
+	case 3000:
+		arch = bfd_arch_mips;
+		number = bfd_mach_mips3000;
+		break;
+
+	case 4000:
+		arch = bfd_arch_mips;
+		number = bfd_mach_mips4000;
+		break;
+
+	case 6000:
+		arch = bfd_arch_rs6000;
+		break;
+
+	case 7410:
+		arch = bfd_arch_sh;
+		number = bfd_mach_sh_dsp;
+		break;
+
+	case 7708:
+		arch = bfd_arch_sh;
+		number = bfd_mach_sh3;
+		break;
+
+	case 7729:
+		arch = bfd_arch_sh;
+		number = bfd_mach_sh3_dsp;
+		break;
+
+	case 7750:
+		arch = bfd_arch_sh;
+		number = bfd_mach_sh4;
+		break;
+
+	default:
+		return false;
+	}
+
+	if (arch != info->arch)
+		return false;
+
+	if (number != info->mach)
+		return false;
+
+	return true;
+}
+
+static const bfd_arch_info_type *
+bfd_default_compatible (const bfd_arch_info_type *a,
+	const bfd_arch_info_type *b)
+{
+	if (a->arch != b->arch)
+		return NULL;
+
+	if (a->bits_per_word != b->bits_per_word)
+		return NULL;
+
+	if (a->mach > b->mach)
+		return a;
+
+	if (b->mach > a->mach)
+		return b;
+
+	return a;
+}
+
+static const bfd_arch_info_type bfd_fr30_arch =
+{
+  32,				/* Bits per word.  */
+  32,				/* Bits per address.  */
+  8,				/* Bits per byte.  */
+  bfd_arch_fr30,		/* Architecture.  */
+  bfd_mach_fr30,		/* Machine.  */
+  "fr30",			/* Architecture name.  */
+  "fr30",			/* Printable name.  */
+  4,				/* Section align power.  */
+  true,				/* The default ?  */
+  bfd_default_compatible,	/* Architecture comparison fn.  */
+  bfd_default_scan,		/* String to architecture convert fn.  */
+  NULL				/* Next in list.  */
+};
+
+static const bfd_arch_info_type * const bfd_archures_list[] = {
+	&bfd_fr30_arch,
+	0
+};
+
 const bfd_arch_info_type *bfd_arch_get_compatible
    (const bfd *abfd, const bfd *bbfd, bfd_boolean accept_unknowns);
 
@@ -2081,9 +2318,6 @@ unsigned int bfd_arch_bits_per_byte (bfd *abfd);
 unsigned int bfd_arch_bits_per_address (bfd *abfd);
 
 const bfd_arch_info_type *bfd_get_arch_info (bfd *abfd);
-
-const bfd_arch_info_type *bfd_lookup_arch
-   (enum bfd_architecture arch, unsigned long machine);
 
 const char *bfd_printable_arch_mach
    (enum bfd_architecture arch, unsigned long machine);
@@ -5308,6 +5542,42 @@ static inline bfd_vma bfd_getl32(const void *p) {
   v |= (unsigned long) addr[3] << 24;
   return v;
 }
+
+static inline void bfd_put_bits (bfd_uint64_t data, void *p, int bits, bool big_p) {
+  bfd_byte *addr = (bfd_byte *) p;
+  int i;
+  int bytes;
+
+//  if (bits % 8 != 0)
+//    abort ();
+
+  bytes = bits / 8;
+  for (i = 0; i < bytes; i++)
+    {
+      int addr_index = big_p ? bytes - i - 1 : i;
+
+      addr[addr_index] = data & 0xff;
+      data >>= 8;
+    }
+}
+
+static inline const bfd_arch_info_type * bfd_lookup_arch (enum bfd_architecture arch, unsigned long machine) {
+  const bfd_arch_info_type * const *app, *ap;
+
+  for (app = bfd_archures_list; *app != NULL; app++)
+    {
+      for (ap = *app; ap != NULL; ap = ap->next)
+	{
+	  if (ap->arch == arch
+	      && (ap->mach == machine
+		  || (machine == 0 && ap->the_default)))
+	    return ap;
+	}
+    }
+
+  return NULL;
+}
+
 #define CONST_STRNEQ(STR1,STR2) (strncmp ((STR1), (STR2), sizeof (STR2) - 1) == 0)
 #define opcodes_error_handler _bfd_error_handler
 #endif
