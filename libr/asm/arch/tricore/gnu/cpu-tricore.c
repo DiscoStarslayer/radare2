@@ -72,38 +72,6 @@ unsigned long tricore_mask_ssr;
 unsigned long tricore_mask_ssro;
 unsigned long tricore_opmask[TRICORE_FMT_MAX];
 
-int
-bfd_default_scan (info, string)
-     const bfd_arch_info_type *info;
-     const char *string;
-{
-	return true;
-}
-
-const bfd_arch_info_type *
-bfd_default_compatible (a, b)
-     const bfd_arch_info_type *a;
-     const bfd_arch_info_type *b;
-{
-	if (a->arch != b->arch) {
-		return NULL;
-	}
-
-	if (a->bits_per_word != b->bits_per_word) {
-		return NULL;
-	}
-
-	if (a->mach > b->mach) {
-		return a;
-	}
-
-	if (b->mach > a->mach) {
-		return b;
-	}
-
-	return a;
-}
-
 void tricore_init_arch_vars PARAMS ((unsigned long));
 
 /* Describe the various flavours of the TriCore architecture.  */
